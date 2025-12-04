@@ -44,11 +44,18 @@ data "aws_ami" "linux_secondary" {
 #############################################
 resource "aws_security_group" "ssh" {
   name        = "allow_ssh"
-  description = "Allow SSH inbound traffic"
+  description = "Allow SSH and HTTP inbound traffic"
 
   ingress {
     from_port   = 22
     to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -67,11 +74,18 @@ resource "aws_security_group" "ssh" {
 resource "aws_security_group" "secondary_ssh" {
   provider    = aws.secondary
   name        = "allow_ssh_secondary"
-  description = "Allow SSH inbound traffic"
+  description = "Allow SSH and HTTP inbound traffic"
 
   ingress {
     from_port   = 22
     to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -92,8 +106,16 @@ resource "aws_instance" "primary_ec2" {
   instance_type   = "t2.micro"
   security_groups = [aws_security_group.ssh.name]
 
+  user_data = <<-EOF
+#!/bin/bash
+sudo yum update -y
+sudo amazon-linux-extras install nginx1 -y
+sudo systemctl enable nginx
+sudo systemctl start nginx
+EOF
+
   tags = {
-    Name = "Primary-EC2-Instance"
+    Name = "Primary-EC2-NGINX"
   }
 }
 
@@ -105,6 +127,14 @@ resource "aws_instance" "secondary_ec2" {
   ami             = data.aws_ami.linux_secondary.id
   instance_type   = "t2.micro"
   security_groups = [aws_security_group.secondary_ssh.name]
+
+  user_data = <<-EOF
+#!/bin/bash
+sudo yum update -y
+sudo amazon-linux-extras install nginx1 -y
+sudo systemctl enable nginx
+sudo systemctl start nginx
+EOF
 
   tags = {
     Name = "Secondary-EC2-Instance"
@@ -121,6 +151,3 @@ output "primary_instance_ip" {
 output "secondary_instance_ip" {
   value = aws_instance.secondary_ec2.public_ip
 }
-
-
-
